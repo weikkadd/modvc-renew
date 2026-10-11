@@ -8,13 +8,32 @@
 
 ```
 modvc-renew/
-├── renew.mjs            # 续期脚本（Node 18+，纯 HTTP）
-├── config.sample.json   # 配置样例（复制为 config.json 后填入真实 token）
-├── README.md            # 完整文档
-└── INSTALL.md           # 快速安装说明
+├── renew.mjs                  # 续期脚本（Node 18+，纯 HTTP）
+├── config.sample.json         # 配置样例（本地部署用）
+├── .github/workflows/renew.yml # GitHub Actions 自动续期（推荐）
+├── README.md                  # 完整文档
+└── INSTALL.md                 # 快速安装说明
 ```
 
-## 快速开始
+## 方式一：GitHub Actions 自动续期（推荐，无需 VPS）
+
+1. **Fork 或 clone 本仓库**到你的 GitHub
+
+2. **设置 Secrets**（仓库 → Settings → Secrets and variables → Actions → New repository secret）：
+
+   | Secret 名称 | 必需 | 说明 |
+   |-------------|------|------|
+   | `MODVC_REFRESH_TOKEN` | ✅ | Firebase refresh token，获取方式见下方 |
+   | `MODVC_TG_BOT_TOKEN` | ❌ | Telegram Bot Token（可选通知） |
+   | `MODVC_TG_CHAT_ID` | ❌ | Telegram Chat ID（可选通知） |
+
+3. **手动触发一次验证**：仓库 → Actions → ModVC Auto Renew → Run workflow
+
+4. 完成！GitHub Actions 每小时自动跑一次，token 轮换后自动更新 Secret
+
+> **注意**：GitHub Actions 的 schedule 不保证准时，可能延迟 5-15 分钟。如果需要精确定时，用 VPS cron 方案。
+
+## 方式二：VPS cron 部署
 
 ```bash
 # 1. clone

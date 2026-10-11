@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // ModVC 免费套餐自动续期 — 纯 HTTP 实现，无需浏览器
 // 流程: Firebase refresh token -> id_token (1h) -> GET /tier 判断剩余时间 -> POST /renew-free
+// 支持: 1) 本地 config.json  2) GitHub Actions 环境变量
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = process.env.MODVC_CONFIG || join(__dirname, 'config.json');
 const LOG_PATH = join(__dirname, 'renew.log');
+const IS_GH_ACTIONS = process.env.GITHUB_ACTIONS === 'true';
 
 // 这两个 key 都来自 panel.modvc.org 前端公开代码（HAR 可见），非私密凭据
 const FIREBASE_API_KEY = 'AIzaSyBONYuQnDHiL-4-sN_dwRx--ozyJhZj4qY';
@@ -26,21 +29,45 @@ function fail(msg, code) {
 }
 
 function loadConfig() {
-  let cfg;
-  try {
-    cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-  } catch (e) {
-    fail(`FATAL 无法读取配置 ${CONFIG_PATH}: ${e.message}`, 1);
-    return null;
+  let cfg = {};
+  if (IS_GH_ACTIONS) {
+    cfg.refreshToken = process.env.MODVC_REFRESH_TOKEN || '';
+    cfg.idToken = '';
+    cfg.renewWithinHours = parseInt(process.env.MODVC_RENEW_WITHIN_HOURS || '24', 10);
+    cfg.notifyTzOffset = parseInt(process.env.MODVC_NOTIFY_TZ_OFFSET || '8', 10);
+    cfg.notifyEveryRun = process.env.MODVC_NOTIFY_EVERY_RUN === 'true';
+    cfg.tgBotToken = process.env.MODVC_TG_BOT_TOKEN || '';
+    cfg.tgChatId = process.env.MODVC_TG_CHAT_ID || '';
+    cfg.notifyWebhook = process.env.MODVC_NOTIFY_WEBHOOK || '';
+    if (!cfg.refreshToken) {
+      fail('FATAL MODVC_REFRESH_TOKEN 环境变量未设置', 1);
+      return null;
+    }
+  } else {
+    try {
+      cfg = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+    } catch (e) {
+      fail(`FATAL 无法读取配置 ${CONFIG_PATH}: ${e.message}`, 1);
+      return null;
+    }
   }
   cfg.renewWithinHours ??= 2;
-  cfg.notifyTzOffset ??= 8;      // 通知显示时区，默认北京时间 UTC+8
-  cfg.notifyEveryRun ??= false; // true=每轮都推；false=仅状态变化时推（避免每小时刷屏） // 剩余不足该小时数时触发续期（留出停机余量）
+  cfg.notifyTzOffset ??= 8;
+  cfg.notifyEveryRun ??= false;
   return cfg;
 }
 
 function saveConfig(cfg) {
-  try { writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + '\n'); } catch { /* 忽略 */ }
+  if (IS_GH_ACTIONS) {
+    try {
+      execSync(`gh secret set MODVC_REFRESH_TOKEN -b "${cfg.refreshToken}"`, { stdio: 'pipe' });
+      log('refresh token 已通过 gh secret 更新到 GitHub');
+    } catch (e) {
+      log('WARN 无法更新 GitHub secret: ' + e.message);
+    }
+  } else {
+    try { writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + '\n'); } catch { /* 忽略 */ }
+  }
 }
 
 class AuthError extends Error {}
