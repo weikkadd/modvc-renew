@@ -1,0 +1,11 @@
+{
+  "_comment": "Sample config. Copy this file to config.json and fill in your own values. Do NOT edit this sample.",
+  "refreshToken": "YOUR_MODVC_REFRESH_TOKEN",
+  "idToken": "",
+  "renewWithinHours": 24,
+  "notifyTzOffset": 8,
+  "notifyEveryRun": false,
+  "tgBotToken": "YOUR_TG_BOT_TOKEN",
+  "tgChatId": "YOUR_TG_CHAT_ID",
+  "notifyWebhook": ""
+}
